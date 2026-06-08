@@ -1,0 +1,22 @@
+Bob Smith
+bob@example.com | +1 555 123 4567 | github.com/bobsmith | linkedin.com/in/bobsmith
+
+SUMMARY
+Software engineer with 6 years of experience building web applications and internal tools.
+
+EXPERIENCE
+Senior Software Engineer | Acme Corp | 2021 - Present
+- Led a dashboard project that improved internal reporting speed by 35%.
+- Built React and TypeScript features for analytics workflows.
+- Collaborated with backend engineers to design stable APIs.
+
+Software Engineer | Beta Labs | 2019 - 2021
+- Developed Python and FastAPI services for data ingestion.
+- Wrote unit and integration tests using pytest and Jest.
+- Reduced bug backlog by 20% through better testing practices.
+
+SKILLS
+React, TypeScript, Python, FastAPI, SQL, Git, Testing, Docker, Agile
+
+EDUCATION
+B.S. Computer Science

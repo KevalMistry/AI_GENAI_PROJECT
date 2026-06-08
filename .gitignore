@@ -1,0 +1,5 @@
+.env
+.env.example
+.venv
+node_modules
+test_audio.py

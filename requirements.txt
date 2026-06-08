@@ -1,0 +1,20 @@
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+requests
+plotly
+numpy
+pypdf
+pytest
+httpx
+PyCharacterAI
+python-dotenv
+SpeechRecognition
+pydub
+
+# Note: Streamlit UI has been removed in favor of the React/Vite frontend.
+
+# Authentication dependencies
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4

@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/* ── Base Reset & Typography ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+/* ── Dark Mode Root Defaults ── */
+html.dark {
+  color-scheme: dark;
+  background-color: #0f1523;
+  color: #e2e8f0;
+}
+
+html.light {
+  color-scheme: light;
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* ── Custom Scrollbar (Dark) ── */
+html.dark ::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+html.dark ::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 9999px;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* ── Custom Scrollbar (Light) ── */
+html.light ::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+html.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+/* ── Hide Scrollbar Utility ── */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ── Selection Highlight ── */
+html.dark ::selection {
+  background: rgba(99, 102, 241, 0.35);
+  color: #e0e7ff;
+}
+html.light ::selection {
+  background: rgba(99, 102, 241, 0.2);
+  color: #3730a3;
+}
+
+/* ── Smooth Transitions for Theme Toggle ── */
+* {
+  transition-property: background-color, border-color, color;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+
+/* ── Focus Visible Outline ── */
+:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ── Bounce animation ── */
+@keyframes bounce-dot {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-6px); }
+}
