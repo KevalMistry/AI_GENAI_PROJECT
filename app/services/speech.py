@@ -2,10 +2,23 @@ from __future__ import annotations
 
 import io
 import math
+import warnings
 import wave
 from array import array
-import speech_recognition as sr
 from pydub import AudioSegment
+
+_speech_recognition = None
+
+
+def get_speech_recognition():
+    global _speech_recognition
+    if _speech_recognition is None:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"speech_recognition")
+            import speech_recognition as sr_module
+
+        _speech_recognition = sr_module
+    return _speech_recognition
 
 
 def transcribe_audio(audio_bytes: bytes, filename: str | None = None) -> str:
@@ -14,6 +27,7 @@ def transcribe_audio(audio_bytes: bytes, filename: str | None = None) -> str:
         return ""
 
     try:
+        sr = get_speech_recognition()
         audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
         wav_io = io.BytesIO()
         audio_segment.export(wav_io, format="wav")

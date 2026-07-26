@@ -66,7 +66,7 @@ def analyze_answer(
     )
 
     return AnswerAnalysis(
-        question_id=str(llm_result.get("question_id") or question.id),
+        question_id=question.id,
         question=str(llm_result.get("question") or question.text),
         transcript=str(llm_result.get("transcript") or transcript),
         scores=score_obj,

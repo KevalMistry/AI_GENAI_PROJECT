@@ -8,9 +8,11 @@ numpy
 pypdf
 pytest
 httpx
+httpx2
 PyCharacterAI
 python-dotenv
 SpeechRecognition
+standard-aifc
 pydub
 
 # Note: Streamlit UI has been removed in favor of the React/Vite frontend.

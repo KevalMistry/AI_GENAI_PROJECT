@@ -1,4 +1,4 @@
-import pytest
+import asyncio
 from fastapi.testclient import TestClient
 from app.main import app
 from app.services.character_ai import CharacterAIService
@@ -27,32 +27,31 @@ def test_get_coaches():
         assert "avatar_color" in coach
         assert isinstance(coach["expertise"], list)
 
-@pytest.mark.asyncio
-async def test_character_ai_service_fallback():
+def test_character_ai_service_fallback():
     """Test that the CharacterAIService returns realistic fallbacks when not authenticated."""
     service = CharacterAIService()
     # Force mock mode
     service.token = None
     
     # Test aarthi fallback
-    reply = await service.send_message("test_session", "aarthi", "Tell me about the STAR method")
+    reply = asyncio.run(service.send_message("test_session", "aarthi", "Tell me about the STAR method"))
     assert "Aarthi" in reply
     assert "STAR" in reply
 
     # Test rohit fallback
-    reply = await service.send_message("test_session", "rohit", "Explain ML models")
+    reply = asyncio.run(service.send_message("test_session", "rohit", "Explain ML models"))
     assert "Rohit" in reply or "model" in reply
 
     # Test allie fallback
-    reply = await service.send_message("test_session", "allie", "How to optimize resume for ATS?")
+    reply = asyncio.run(service.send_message("test_session", "allie", "How to optimize resume for ATS?"))
     assert "Allie" in reply or "ATS" in reply
 
     # Test blaise fallback
-    reply = await service.send_message("test_session", "blaise", "AI Research models")
+    reply = asyncio.run(service.send_message("test_session", "blaise", "AI Research models"))
     assert "Blaise" in reply
 
     # Test jeff fallback
-    reply = await service.send_message("test_session", "jeff", "How should I design distributed scale?")
+    reply = asyncio.run(service.send_message("test_session", "jeff", "How should I design distributed scale?"))
     assert "Jeff" in reply or "distrib" in reply
 
 def test_coach_chat_endpoint_fallback():

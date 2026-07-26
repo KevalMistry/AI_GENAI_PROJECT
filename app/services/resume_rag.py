@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 import re
 import zipfile
@@ -44,6 +45,9 @@ SKILL_TERMS = {
     # Management
     "leadership", "project management", "product management", "mentorship", "scrum master"
 }
+
+
+logger = logging.getLogger(__name__)
 
 
 SECTION_PATTERNS = {
@@ -297,63 +301,83 @@ def analyze_resume(
     job_description: str = "",
     service: ResumeRAGService | None = None,
 ) -> ResumeAnalysisResponse:
+    """Score a resume using deterministic, reproducible sub-scores computed from
+    the actual text (experience, education, formatting, impact, sections,
+    contact info, role alignment, keyword match). The LLM is used only for the
+    narrative summary, grounded in the real computed scores -- and if the LLM
+    is unavailable or fails, we fall back to a local summary instead of
+    failing the whole request.
+    """
     document = (service or ResumeRAGService()).index_resume(candidate_name, file_name, file_bytes)
-    resume_excerpt = document.raw_text[:12000]
-    prompt = (
-        "You are an expert AI resume analyzer for hiring and ATS review. "
-        "Analyze the resume and, if provided, the job description. Return EXACTLY one JSON object with these keys: "
-        "ats_score (0-100), keyword_match_score (0-100), formatting_score (0-100), impact_score (0-100), "
-        "section_score (0-100), matched_skills (array of strings), missing_skills (array of strings), "
-        "extracted_skills (array of strings), summary (1-3 sentences), score_cards (array of objects with label, value, description), "
-        "suggestions (array of objects with type, title, detail). "
-        "Use realistic scores and keep the response concise and grounded in the provided resume. "
-        f"Candidate name: {candidate_name}. File name: {file_name}. "
-        f"Job description: {job_description or 'Not provided'}. "
-        f"Resume text: {resume_excerpt}"
+    text = document.raw_text
+    extracted_skills = document.extracted_skills
+
+    experience_score = resume_experience_score(text)
+    education_score = resume_education_score(text)
+    formatting_score = resume_formatting_score(text)
+    impact_score = resume_impact_score(text)
+    section_score = resume_section_score(text)
+    contact_score = resume_contact_score(text)
+    role_alignment_score = resume_role_alignment_score(text, job_description)
+
+    job_terms = extract_job_terms(job_description)
+    lowered_text = text.lower()
+    if job_terms:
+        matched_skills = [term for term in job_terms if term_in_text(term, lowered_text)]
+        missing_skills = [term for term in job_terms if term not in matched_skills]
+    else:
+        matched_skills = list(extracted_skills)
+        missing_skills = []
+
+    keyword_score = keyword_match_score(matched_skills, job_terms, extracted_skills)
+
+    ats_score = round(
+        clamp_score(
+            experience_score * 0.20
+            + education_score * 0.10
+            + formatting_score * 0.15
+            + impact_score * 0.20
+            + section_score * 0.10
+            + contact_score * 0.05
+            + role_alignment_score * 0.10
+            + keyword_score * 0.10
+        ),
+        1,
     )
 
-    llm_result = llm.complete_json(prompt, timeout=60)
-    if not isinstance(llm_result, dict):
-        raise RuntimeError("LLM returned an invalid resume analysis payload")
-
-    matched_skills = [str(item) for item in llm_result.get("matched_skills", []) or []]
-    missing_skills = [str(item) for item in llm_result.get("missing_skills", []) or []]
-    extracted_skills = [str(item) for item in llm_result.get("extracted_skills", []) or []]
-    summary = str(llm_result.get("summary") or "").strip()
-    if not summary:
-        raise RuntimeError("LLM returned an empty resume summary")
-
-    score_cards_data = llm_result.get("score_cards", []) or []
-    suggestion_data = llm_result.get("suggestions", []) or []
+    suggestions = resume_suggestions(
+        ats_score,
+        keyword_score,
+        formatting_score,
+        impact_score,
+        section_score,
+        contact_score,
+        experience_score,
+        education_score,
+        missing_skills,
+    )
 
     score_cards = [
-        ResumeScoreCard(
-            label=str(item.get("label") or "Insight"),
-            value=round(clamp_score(parse_score_value(item.get("value", 0))), 1),
-            description=str(item.get("description") or ""),
-        )
-        for item in score_cards_data
-        if isinstance(item, dict)
-    ]
-    suggestions = [
-        ResumeSuggestion(
-            type=normalize_suggestion_type(item.get("type")),
-            title=str(item.get("title") or "Recommendation"),
-            detail=str(item.get("detail") or ""),
-        )
-        for item in suggestion_data
-        if isinstance(item, dict)
+        ResumeScoreCard(label="ATS Score", value=ats_score, description="Overall resume fit for ATS parsing and role alignment."),
+        ResumeScoreCard(label="Experience", value=experience_score, description="Work history depth, titles, and tenure signals."),
+        ResumeScoreCard(label="Education", value=education_score, description="Degrees, certifications, and academic credentials."),
+        ResumeScoreCard(label="Formatting", value=formatting_score, description="Length, structure, and ATS-friendly layout."),
+        ResumeScoreCard(label="Impact", value=impact_score, description="Quantified achievements and action-oriented language."),
+        ResumeScoreCard(label="Section Coverage", value=section_score, description="Presence of standard resume sections."),
+        ResumeScoreCard(label="Contact & Links", value=contact_score, description="Discoverable contact info and professional links."),
+        ResumeScoreCard(label="Role Alignment", value=role_alignment_score, description="Match to the target role and job description."),
     ]
 
-    ats_score = round(clamp_score(parse_score_value(llm_result.get("ats_score", 0))), 1)
-    keyword_score = round(clamp_score(parse_score_value(llm_result.get("keyword_match_score", 0))), 1)
-    formatting_score = round(clamp_score(parse_score_value(llm_result.get("formatting_score", 0))), 1)
-    impact_score = round(clamp_score(parse_score_value(llm_result.get("impact_score", 0))), 1)
-    section_score = round(clamp_score(parse_score_value(llm_result.get("section_score", 0))), 1)
+    summary = _generate_summary(
+        candidate_name=candidate_name,
+        text=text,
+        job_description=job_description,
+        ats_score=ats_score,
+        matched_skills=matched_skills,
+        missing_skills=missing_skills,
+    )
 
     document.summary = summary
-    if extracted_skills:
-        document.extracted_skills = extracted_skills[:16]
 
     return ResumeAnalysisResponse(
         resume_id=document.resume_id,
@@ -371,6 +395,42 @@ def analyze_resume(
         score_cards=score_cards,
         suggestions=suggestions,
     )
+
+
+def _generate_summary(
+    candidate_name: str,
+    text: str,
+    job_description: str,
+    ats_score: float,
+    matched_skills: list[str],
+    missing_skills: list[str],
+) -> str:
+    """Try an LLM-written summary grounded in the real computed scores.
+    Falls back to a local extractive summary if the LLM is unconfigured
+    or the call fails for any reason -- this must never crash the request.
+    """
+    if llm.is_configured():
+        prompt = (
+            "You are an expert resume reviewer. Write a concise 1-3 sentence summary "
+            "of this candidate for a recruiter. Do not invent scores -- use the ones given. "
+            "Return EXACTLY one JSON object with a single key 'summary' (string).\n"
+            f"Candidate name: {candidate_name}.\n"
+            f"Computed overall ATS score: {ats_score}/100.\n"
+            f"Matched skills: {', '.join(matched_skills[:12]) or 'none identified'}.\n"
+            f"Missing skills vs job description: {', '.join(missing_skills[:8]) or 'none'}.\n"
+            f"Job description: {job_description or 'Not provided'}.\n"
+            f"Resume text (truncated): {text[:6000]}"
+        )
+        try:
+            result = llm.complete_json(prompt, timeout=30)
+            if isinstance(result, dict):
+                summary = str(result.get("summary") or "").strip()
+                if summary:
+                    return summary
+        except Exception:
+            logger.exception("LLM summary generation failed; falling back to local summary")
+
+    return summarize_resume(text)
 
 
 def extract_job_terms(job_description: str) -> list[str]:

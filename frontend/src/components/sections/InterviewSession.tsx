@@ -76,6 +76,7 @@ const InterviewSession: React.FC = () => {
   const [report, setReport] = useState<InterviewReport | null>(null);
   const [loadingAction, setLoadingAction] = useState<LoadingAction>(null);
   const [error, setError] = useState<string | null>(null);
+  const [terminationReason, setTerminationReason] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
   const [isPlayingRecording, setIsPlayingRecording] = useState(false);
@@ -94,6 +95,7 @@ const InterviewSession: React.FC = () => {
   const speechShouldRunRef = useRef(false);
   const audioChunksRef = useRef<Blob[]>([]);
   const playbackRef = useRef<HTMLAudioElement | null>(null);
+  const autoEndTriggeredRef = useRef(false);
 
   const currentQuestion = session?.questions[questionIdx] ?? null;
   const isLastQuestion = questionIdx >= Math.max((session?.questions.length ?? 1) - 1, 0);
@@ -164,9 +166,11 @@ const InterviewSession: React.FC = () => {
     setError(null);
     setReport(null);
     setAnalyses([]);
+    setTerminationReason(null);
     setQuestionIdx(0);
     setAnswerText('');
     setRecordedAudio(null);
+    autoEndTriggeredRef.current = false;
 
     try {
       const nextSession = await interviewApi.startInterview({
@@ -361,11 +365,62 @@ const InterviewSession: React.FC = () => {
   };
 
   const handleEnd = () => {
+    setTerminationReason(null);
     void createFinalReport();
   };
 
+  useEffect(() => {
+    if (stage !== 'active' || !session) return;
+
+    const endForFocusLoss = () => {
+      if (autoEndTriggeredRef.current) return;
+      autoEndTriggeredRef.current = true;
+      setTerminationReason('The interview ended automatically because the page lost focus or became hidden.');
+      setLoadingAction(null);
+      if (playbackRef.current) {
+        playbackRef.current.pause();
+      }
+      recorderRef.current?.stop();
+      stopSpeechRecognition();
+      stopMediaTracks();
+      stopCameraTracks();
+      setIsRecording(false);
+      setStage('feedback');
+      if (analyses.length > 0) {
+        void createFinalReport(analyses);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        endForFocusLoss();
+      }
+    };
+
+    const handleWindowBlur = () => {
+      endForFocusLoss();
+    };
+
+    const handlePageHide = () => {
+      endForFocusLoss();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, [analyses, createFinalReport, session, stage]);
+
   const resetInterview = () => {
     stopMediaTracks();
+    stopCameraTracks();
+    stopSpeechRecognition();
+    autoEndTriggeredRef.current = false;
     setStage('setup');
     setSession(null);
     setQuestionIdx(0);
@@ -375,6 +430,7 @@ const InterviewSession: React.FC = () => {
     setAnalyses([]);
     setReport(null);
     setError(null);
+    setTerminationReason(null);
     setAudioMuted(false);
   };
 
@@ -756,6 +812,11 @@ const InterviewSession: React.FC = () => {
   return (
     <div className="max-w-2xl mx-auto space-y-5">
       {ErrorNotice}
+      {terminationReason && (
+        <div className={`rounded-2xl border px-5 py-4 text-sm font-medium ${isDark ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          {terminationReason}
+        </div>
+      )}
       <div className={`rounded-2xl border p-6 text-center ${cardBg}`}>
         <div className="inline-flex p-3 rounded-xl bg-indigo-500/15 mb-3">
           <CheckCircle2 size={28} className="text-indigo-400" />
