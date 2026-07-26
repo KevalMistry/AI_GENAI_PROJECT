@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 from fastapi import FastAPI, File, Form, UploadFile, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -58,9 +59,15 @@ from app.services.auth import Token, User
 
 app = FastAPI(title="AI Speech Interview Platform", version="0.1.0")
 
+DEFAULT_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+_extra_origins = os.getenv("ALLOWED_ORIGINS", "")
+ALLOWED_ORIGINS = DEFAULT_ORIGINS + [
+    origin.strip() for origin in _extra_origins.split(",") if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
