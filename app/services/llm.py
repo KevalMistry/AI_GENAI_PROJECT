@@ -13,7 +13,7 @@ logger = logging.getLogger("app.services.llm")
 # Expect the user to provide GROQ_API_URL and GROQ_API_KEY in the environment.
 GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions").strip()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b").strip()
 
 
 def is_configured() -> bool:
